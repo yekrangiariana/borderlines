@@ -581,6 +581,10 @@ body.name-modal-open {
   -webkit-tap-highlight-color: transparent;
 }
 
+#worldMapSvg.is-zooming {
+  cursor: grabbing;
+}
+
 #worldMapSvg:active {
   cursor: grabbing;
 }
@@ -593,6 +597,15 @@ body.name-modal-open {
   stroke-linecap: round;
   vector-effect: non-scaling-stroke;
   shape-rendering: geometricPrecision;
+}
+
+#worldMapSvg.is-zooming .world-country {
+  vector-effect: none;
+  shape-rendering: optimizeSpeed;
+}
+
+#worldMapSvg.is-zooming .world-map-label-tag {
+  opacity: 0;
 }
 
 .world-country[data-iso2] {
@@ -869,6 +882,12 @@ button.ghost {
 button.ghost:hover {
   background: #f6f6f4;
   border-color: var(--accent);
+}
+
+#backToModesBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 #submitBtn,

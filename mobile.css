@@ -13,8 +13,7 @@
   body {
     min-height: 100dvh;
     max-height: none;
-    align-items: stretch;
-    justify-content: stretch;
+    display: block;
     overflow-y: auto;
     overflow-x: hidden;
   }
@@ -27,12 +26,12 @@
   .app {
     width: 100%;
     max-width: 100%;
-    min-height: 100dvh;
+    min-height: 0;
     height: auto;
     margin: 0;
     padding: 6px;
-    display: grid;
-    grid-template-rows: auto auto auto;
+    display: flex;
+    flex-direction: column;
     gap: var(--mobile-gap);
     overflow: visible;
   }

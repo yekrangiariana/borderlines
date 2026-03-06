@@ -12,12 +12,26 @@ export function createMapAssistManager({
   let currentViewport = null;
   let currentTransform = null;
   let suppressSelectionUntil = 0;
+  let zoomFrameId = 0;
+  let pendingTransform = null;
+  let zoomingClassTimer = null;
+  let gestureNeedsSelectionSuppression = false;
 
   function clearMap() {
     worldMapWrap.classList.add("hidden");
     worldMapSvg.innerHTML = "";
     currentViewport = null;
     currentTransform = null;
+    pendingTransform = null;
+    worldMapSvg.classList.remove("is-zooming");
+    if (zoomFrameId) {
+      cancelAnimationFrame(zoomFrameId);
+      zoomFrameId = 0;
+    }
+    if (zoomingClassTimer) {
+      clearTimeout(zoomingClassTimer);
+      zoomingClassTimer = null;
+    }
   }
 
   function setViewportTransform(transform) {
@@ -32,14 +46,45 @@ export function createMapAssistManager({
 
   function noteGesture(event) {
     const eventType = event?.sourceEvent?.type || "";
-    if (
-      eventType.includes("touch") ||
-      eventType.includes("mouse") ||
-      eventType.includes("pointer") ||
-      eventType === "wheel"
-    ) {
+    const isTouchGesture = eventType.includes("touch");
+    const isWheelGesture = eventType === "wheel";
+    if (isTouchGesture || isWheelGesture) {
+      gestureNeedsSelectionSuppression = true;
       suppressSelectionUntil = Date.now() + 220;
     }
+  }
+
+  function setZoomingVisualState(active) {
+    if (zoomingClassTimer) {
+      clearTimeout(zoomingClassTimer);
+      zoomingClassTimer = null;
+    }
+
+    if (active) {
+      worldMapSvg.classList.add("is-zooming");
+      return;
+    }
+
+    zoomingClassTimer = setTimeout(() => {
+      worldMapSvg.classList.remove("is-zooming");
+      zoomingClassTimer = null;
+    }, 90);
+  }
+
+  function scheduleViewportTransform(transform) {
+    pendingTransform = transform;
+    if (zoomFrameId) {
+      return;
+    }
+
+    zoomFrameId = requestAnimationFrame(() => {
+      zoomFrameId = 0;
+      if (!pendingTransform) {
+        return;
+      }
+      setViewportTransform(pendingTransform);
+      pendingTransform = null;
+    });
   }
 
   function ensureZoom(d3) {
@@ -60,15 +105,20 @@ export function createMapAssistManager({
         [1160, 610],
       ])
       .on("start", (event) => {
+        gestureNeedsSelectionSuppression = false;
         noteGesture(event);
+        setZoomingVisualState(true);
       })
       .on("zoom", (event) => {
         noteGesture(event);
         currentTransform = event.transform;
-        setViewportTransform(event.transform);
+        scheduleViewportTransform(event.transform);
       })
       .on("end", () => {
-        suppressSelectionUntil = Date.now() + 120;
+        if (gestureNeedsSelectionSuppression) {
+          suppressSelectionUntil = Date.now() + 120;
+        }
+        setZoomingVisualState(false);
       });
 
     svgSelection.call(zoomBehavior).on("dblclick.zoom", null);
@@ -115,7 +165,7 @@ export function createMapAssistManager({
 
     const projection = d3.geoNaturalEarth1();
     // Smaller precision keeps coastlines smoother when users zoom deeply.
-    projection.precision(0.2);
+    projection.precision(0.35);
     const fitTarget = focusedFeatures.length
       ? focusCollection
       : featureCollection;
@@ -173,8 +223,6 @@ export function createMapAssistManager({
           ? " focus"
           : "";
       p.setAttribute("class", `world-country${roleClass}`);
-      p.setAttribute("vector-effect", "non-scaling-stroke");
-      p.setAttribute("shape-rendering", "geometricPrecision");
       currentViewport.appendChild(p);
       centroidByIso2.set(country.iso2, path.centroid(country.feature));
     });
