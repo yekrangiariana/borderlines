@@ -18,6 +18,14 @@ const US_STATES_TOPOLOGY_URL = new URL(
   "../data/us_states_10m.json",
   import.meta.url,
 );
+const UK_AREAS_GEOJSON_URL = new URL(
+  "../data/uk_admin_areas.geojson",
+  import.meta.url,
+);
+const FINLAND_AREAS_GEOJSON_URL = new URL(
+  "../data/finland_admin_areas.geojson",
+  import.meta.url,
+);
 
 const BORDER_OVERRIDES = [["SG", "MY"]];
 
@@ -163,6 +171,91 @@ function hasRenderableGeometry(feature) {
   }
 
   return true;
+}
+
+function coordinateKey(coord) {
+  if (!Array.isArray(coord) || coord.length < 2) {
+    return "";
+  }
+  const lon = Number(coord[0]);
+  const lat = Number(coord[1]);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) {
+    return "";
+  }
+  return `${lon.toFixed(5)},${lat.toFixed(5)}`;
+}
+
+function addRingSegments(ring, ownerId, segmentOwners) {
+  if (!Array.isArray(ring) || ring.length < 2) {
+    return;
+  }
+
+  for (let i = 1; i < ring.length; i += 1) {
+    const left = coordinateKey(ring[i - 1]);
+    const right = coordinateKey(ring[i]);
+    if (!left || !right || left === right) {
+      continue;
+    }
+
+    const segmentKey = left < right ? `${left}|${right}` : `${right}|${left}`;
+    if (!segmentOwners.has(segmentKey)) {
+      segmentOwners.set(segmentKey, new Set());
+    }
+    segmentOwners.get(segmentKey).add(ownerId);
+  }
+}
+
+function addFeatureSegments(feature, ownerId, segmentOwners) {
+  const geometry = feature?.geometry;
+  if (!geometry) {
+    return;
+  }
+
+  if (geometry.type === "Polygon") {
+    (geometry.coordinates || []).forEach((ring) => {
+      addRingSegments(ring, ownerId, segmentOwners);
+    });
+    return;
+  }
+
+  if (geometry.type === "MultiPolygon") {
+    (geometry.coordinates || []).forEach((polygon) => {
+      (polygon || []).forEach((ring) => {
+        addRingSegments(ring, ownerId, segmentOwners);
+      });
+    });
+  }
+}
+
+function buildNeighborMapBySharedSegments(items) {
+  const byId = new Map();
+  const segmentOwners = new Map();
+  items.forEach((item) => {
+    if (!item?.id || !item?.feature) {
+      return;
+    }
+    byId.set(item.id, item);
+    addFeatureSegments(item.feature, item.id, segmentOwners);
+  });
+
+  const neighborsById = new Map();
+  byId.forEach((_, id) => neighborsById.set(id, new Set()));
+
+  segmentOwners.forEach((owners) => {
+    if (!owners || owners.size < 2) {
+      return;
+    }
+
+    const ids = [...owners];
+    for (let i = 0; i < ids.length; i += 1) {
+      for (let j = i + 1; j < ids.length; j += 1) {
+        neighborsById.get(ids[i])?.add(ids[j]);
+        neighborsById.get(ids[j])?.add(ids[i]);
+      }
+    }
+  });
+
+  return neighborsById;
 }
 
 export async function loadGameData() {
@@ -422,6 +515,161 @@ export async function loadUsStateData() {
       regionLabel: "US States",
       itemSingular: "state",
       itemPlural: "states",
+      mapLabel: "country map",
+    },
+  };
+}
+
+export async function loadUkAreaData() {
+  const geoRes = await fetch(UK_AREAS_GEOJSON_URL);
+  if (!geoRes.ok) {
+    throw new Error(`Failed to load UK area outlines: ${geoRes.status}`);
+  }
+
+  const geojson = await geoRes.json();
+  const countries = [];
+  const iso2ToCountry = new Map();
+  const aliasToIso2 = new Map();
+
+  (geojson.features || []).forEach((feature) => {
+    const props = feature?.properties || {};
+    const rawCode = String(props.code || "")
+      .trim()
+      .toUpperCase();
+    const name = String(props.name || "").trim();
+    if (!rawCode || !name || !hasRenderableGeometry(feature)) {
+      return;
+    }
+
+    const shortCode = rawCode.startsWith("GB-") ? rawCode.slice(3) : rawCode;
+    const iso2 = rawCode;
+    const aliases = new Set([
+      normalize(name),
+      normalize(shortCode),
+      normalize(rawCode),
+    ]);
+
+    const entry = {
+      iso2,
+      iso3: shortCode,
+      name,
+      continent: "United Kingdom",
+      feature,
+      aliases,
+      neighbors: new Set(),
+    };
+
+    countries.push(entry);
+    iso2ToCountry.set(iso2, entry);
+    aliases.forEach((alias) => {
+      if (alias && !aliasToIso2.has(alias)) {
+        aliasToIso2.set(alias, iso2);
+      }
+    });
+  });
+
+  const neighborsById = buildNeighborMapBySharedSegments(
+    countries.map((area) => ({ id: area.iso2, feature: area.feature })),
+  );
+
+  countries.forEach((area) => {
+    area.neighbors = neighborsById.get(area.iso2) || new Set();
+  });
+
+  countries.forEach((area) => {
+    area.neighborNames = [...area.neighbors]
+      .map((iso2) => iso2ToCountry.get(iso2)?.name)
+      .filter(Boolean)
+      .sort();
+  });
+
+  return {
+    countries,
+    iso2ToCountry,
+    aliasToIso2,
+    meta: {
+      id: "uk-areas",
+      regionLabel: "UK Areas",
+      itemSingular: "area",
+      itemPlural: "areas",
+      mapLabel: "country map",
+    },
+  };
+}
+
+export async function loadFinlandAreaData() {
+  const geoRes = await fetch(FINLAND_AREAS_GEOJSON_URL);
+  if (!geoRes.ok) {
+    throw new Error(`Failed to load Finland area outlines: ${geoRes.status}`);
+  }
+
+  const geojson = await geoRes.json();
+  const countries = [];
+  const iso2ToCountry = new Map();
+  const aliasToIso2 = new Map();
+
+  (geojson.features || []).forEach((feature) => {
+    const props = feature?.properties || {};
+    const rawCode = String(props.code || "")
+      .trim()
+      .toUpperCase();
+    const name = String(props.name || "").trim();
+    if (!rawCode || !name || !hasRenderableGeometry(feature)) {
+      return;
+    }
+
+    const shortCode = rawCode.startsWith("FI-") ? rawCode.slice(3) : rawCode;
+    const iso2 = rawCode;
+    const aliases = new Set([
+      normalize(name),
+      normalize(shortCode),
+      normalize(rawCode),
+      normalize(`region of ${name}`),
+    ]);
+
+    const entry = {
+      iso2,
+      iso3: shortCode,
+      name,
+      continent: "Finland",
+      feature,
+      aliases,
+      neighbors: new Set(),
+    };
+
+    countries.push(entry);
+    iso2ToCountry.set(iso2, entry);
+    aliases.forEach((alias) => {
+      if (alias && !aliasToIso2.has(alias)) {
+        aliasToIso2.set(alias, iso2);
+      }
+    });
+  });
+
+  const neighborsById = buildNeighborMapBySharedSegments(
+    countries.map((area) => ({ id: area.iso2, feature: area.feature })),
+  );
+
+  countries.forEach((area) => {
+    area.neighbors = neighborsById.get(area.iso2) || new Set();
+  });
+
+  countries.forEach((area) => {
+    area.neighborNames = [...area.neighbors]
+      .map((iso2) => iso2ToCountry.get(iso2)?.name)
+      .filter(Boolean)
+      .sort();
+  });
+
+  return {
+    countries,
+    iso2ToCountry,
+    aliasToIso2,
+    meta: {
+      id: "finland-areas",
+      regionLabel: "Finland Regions",
+      itemSingular: "region",
+      itemPlural: "regions",
       mapLabel: "country map",
     },
   };

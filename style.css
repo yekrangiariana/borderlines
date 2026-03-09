@@ -11,11 +11,12 @@
   --wrong: #ad2d2d;
   --shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
   --font-ui:
-    "Stag Sans", "Stag Sans Web", "Avenir Next", "Helvetica Neue", "Segoe UI",
-    Arial, sans-serif;
+    ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
   --font-ui-emoji:
-    "Stag Sans", "Stag Sans Web", "Avenir Next", "Helvetica Neue", "Segoe UI",
-    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", Arial, sans-serif;
+    ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", "Apple Color Emoji",
+    "Segoe UI Emoji", "Noto Color Emoji", monospace;
 }
 
 * {
@@ -706,7 +707,11 @@ body.in-mode .header h1 {
   cursor: grabbing;
 }
 
-#worldMapSvg:active {
+#worldMapSvg.map-select-mode {
+  cursor: default;
+}
+
+#worldMapSvg.map-select-mode.is-zooming {
   cursor: grabbing;
 }
 
@@ -727,6 +732,10 @@ body.in-mode .header h1 {
 
 .world-country[data-iso2] {
   cursor: inherit;
+}
+
+#worldMapSvg.map-select-mode .world-country[data-iso2] {
+  cursor: pointer;
 }
 
 @media (hover: hover) and (pointer: fine) {

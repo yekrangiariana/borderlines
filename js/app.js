@@ -1,6 +1,8 @@
 import {
   drawOutline,
+  loadFinlandAreaData,
   loadGameData,
+  loadUkAreaData,
   loadUsStateData,
   normalize,
 } from "./gameData.js";
@@ -160,6 +162,8 @@ const modeCatalog = [
 const state = {
   data: null,
   usStateData: null,
+  ukAreaData: null,
+  finlandAreaData: null,
   activeData: null,
   session: null,
   currentQuestion: null,
@@ -461,12 +465,22 @@ function getRegionOptions() {
       label: continent,
     })),
     { value: "us-states", label: "US States" },
+    { value: "uk-areas", label: "UK Areas" },
+    { value: "finland-areas", label: "Finland Regions" },
   ];
 }
 
 function buildActiveDataForRegion(regionValue) {
   if (regionValue === "us-states") {
     return state.usStateData;
+  }
+
+  if (regionValue === "uk-areas") {
+    return state.ukAreaData;
+  }
+
+  if (regionValue === "finland-areas") {
+    return state.finlandAreaData;
   }
 
   if (String(regionValue || "").startsWith("continent:")) {
@@ -1599,6 +1613,15 @@ function applyMapAssistDefault(question) {
   }
 }
 
+function updateWorldMapInteractionMode() {
+  if (!worldMapSvg) {
+    return;
+  }
+
+  const isMapSelect = state.currentQuestion?.input?.type === "map-select";
+  worldMapSvg.classList.toggle("map-select-mode", isMapSelect);
+}
+
 function showQuestion() {
   state.currentQuestion = state.session.nextQuestion();
   state.hasSubmitted = false;
@@ -1617,6 +1640,7 @@ function showQuestion() {
 
   promptLabel.textContent = state.currentQuestion.prompt;
   hintLabel.textContent = state.currentQuestion.hint || "";
+  updateWorldMapInteractionMode();
   applyMapAssistDefault(state.currentQuestion);
   mapAssist.renderWorldAssist(state.currentQuestion, state.hasSubmitted, {
     resetZoom: true,
@@ -1946,6 +1970,7 @@ function backToModes() {
   topNavRow.classList.add("hidden");
   worldMapWrap.classList.add("hidden");
   worldMapSvg.innerHTML = "";
+  worldMapSvg.classList.remove("map-select-mode");
   resultOverlay.classList.add("hidden");
   setFeedback("");
   setHomeViewClass(true);
@@ -2183,12 +2208,17 @@ async function init() {
     countryAutocomplete.attachInput(chainInput1);
     countryAutocomplete.attachInput(chainInput2);
 
-    const [worldData, usStateData] = await Promise.all([
-      loadGameData(),
-      loadUsStateData(),
-    ]);
+    const [worldData, usStateData, ukAreaData, finlandAreaData] =
+      await Promise.all([
+        loadGameData(),
+        loadUsStateData(),
+        loadUkAreaData(),
+        loadFinlandAreaData(),
+      ]);
     state.data = worldData;
     state.usStateData = usStateData;
+    state.ukAreaData = ukAreaData;
+    state.finlandAreaData = finlandAreaData;
 
     const options = getRegionOptions();
     continentSelect.innerHTML = "";

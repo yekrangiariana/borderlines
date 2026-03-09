@@ -12,7 +12,7 @@ A local-first geography game using country and US state outlines plus border-adj
 ## Settings
 
 - From the mode selection screen, open `Settings` and choose a region.
-- Supported regions include `All Countries`, individual continents, and `US States`.
+- Supported regions include `All Countries`, individual continents, `US States`, `UK Areas`, and `Finland Regions`.
 - The selected region limits question generation and accepted answers across non-competitive modes.
 
 ## Run
@@ -157,6 +157,8 @@ For stricter anti-cheat, add a Supabase Edge Function that validates signed game
 
 - `data/all_primary_countries.min.geojson` (country outlines)
 - `data/us_states_10m.json` (US states topology)
+- `data/uk_admin_areas.geojson` (UK admin areas)
+- `data/finland_admin_areas.geojson` (Finland admin areas)
 - `data/GEODATASOURCE-COUNTRY-BORDERS.CSV` (border relationships)
 - `data/countries.csv` (country attributes)
 - `data/svgs/` and `data/svgs.zip` (WRI SVG map files)
