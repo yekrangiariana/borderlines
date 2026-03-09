@@ -341,9 +341,24 @@ function renderOutlineBackdrop(data) {
     return;
   }
 
-  const rows = 10;
   const isMobile = window.matchMedia("(max-width: 780px)").matches;
   const isWide = window.matchMedia("(min-width: 1280px)").matches;
+  const viewportHeight = Math.max(window.innerHeight || 0, 320);
+
+  const tokenHeight = isMobile ? 50 : isWide ? 90 : 72;
+  const lineGap = isMobile ? 12 : isWide ? 20 : 16;
+  const rowStep = tokenHeight + lineGap;
+
+  // Keep rows separated by a fixed pixel step so short viewports never collide.
+  const computedRows = Math.floor((viewportHeight - tokenHeight) / rowStep) + 1;
+  const rows = isWide
+    ? Math.max(8, Math.ceil(viewportHeight / rowStep) + 1)
+    : Math.max(4, Math.min(10, computedRows));
+  const occupiedHeight = tokenHeight + (rows - 1) * rowStep;
+  const startTop = isWide
+    ? 0
+    : Math.max(0, Math.floor((viewportHeight - occupiedHeight) / 2));
+
   const perRow = isMobile ? 8 : isWide ? 14 : 11;
 
   for (let rowIndex = 0; rowIndex < rows; rowIndex += 1) {
@@ -352,7 +367,7 @@ function renderOutlineBackdrop(data) {
     if (rowIndex % 2 === 1) {
       row.classList.add("reverse");
     }
-    row.style.top = `${(rowIndex / rows) * 100}%`;
+    row.style.top = `${startTop + rowIndex * rowStep}px`;
     row.style.setProperty("--row-duration", `${28 + Math.random() * 18}s`);
     row.style.setProperty("--row-delay", `${-1 * Math.random() * 10}s`);
 
