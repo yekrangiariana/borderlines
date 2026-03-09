@@ -486,7 +486,9 @@ function updateActiveFilterLabel() {
 }
 
 function getEffectiveRegionForMode(modeId) {
-  return modeId === COMPETITIVE_MODE_ID ? "all-countries" : state.settings.region;
+  return modeId === COMPETITIVE_MODE_ID
+    ? "all-countries"
+    : state.settings.region;
 }
 
 function getActiveVocabulary() {
@@ -513,7 +515,8 @@ function getModeCardVocabulary(modeId) {
     };
   }
 
-  const previewData = buildActiveDataForRegion(state.settings.region) || state.data;
+  const previewData =
+    buildActiveDataForRegion(state.settings.region) || state.data;
   return {
     singular: previewData?.meta?.itemSingular || "country",
     plural: previewData?.meta?.itemPlural || "countries",
