@@ -20,6 +20,7 @@ function formatBorderSummary(country) {
 }
 
 export function createBattleQuestion(left, right) {
+  const itemSingular = left?.meta?.itemSingular || "country";
   const leftCount = left?.neighbors.size || 0;
   const rightCount = right?.neighbors.size || 0;
   const leftLabel = formatCountryWithFlag(left?.name, left?.iso2);
@@ -32,8 +33,8 @@ export function createBattleQuestion(left, right) {
   }
 
   return {
-    prompt: `Which country has more land borders, ${leftLabel} or ${rightLabel}?`,
-    hint: "Pick the country with more land borders, or Tie.",
+    prompt: `Which ${itemSingular} has more land borders, ${leftLabel} or ${rightLabel}?`,
+    hint: `Pick the ${itemSingular} with more land borders, or Tie.`,
     input: {
       type: "choice",
       options: [
@@ -131,7 +132,10 @@ export function createBattleMode(data, rng = Math.random) {
       }
 
       round += 1;
-      return createBattleQuestion(left, right);
+      return createBattleQuestion(
+        { ...left, meta: data?.meta || null },
+        { ...right, meta: data?.meta || null },
+      );
     },
   };
 }

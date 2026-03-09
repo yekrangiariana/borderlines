@@ -10,11 +10,13 @@ export function createMapSelectQuestion(
   distanceLookup = null,
 ) {
   let selectedIso2 = null;
+  const itemSingular = target?.meta?.itemSingular || "country";
+  const mapLabel = target?.meta?.mapLabel || "world map";
 
   const countryNameFromIso2 = (iso2) => {
     const cleanIso2 = String(iso2 || "").toUpperCase();
     if (!cleanIso2 || !iso2ToCountry?.get) {
-      return cleanIso2 || "that country";
+      return cleanIso2 || `that ${itemSingular}`;
     }
     return iso2ToCountry.get(cleanIso2)?.name || cleanIso2;
   };
@@ -29,15 +31,18 @@ export function createMapSelectQuestion(
 
     return {
       highlights,
-      // Keep a stable world camera while choosing to avoid abrupt reprojection.
+      // Keep a stable camera while choosing to avoid abrupt reprojection.
       zoomIso2: [],
     };
   };
 
   return {
-    prompt: `Find ${targetLabel} on the world map and select it.`,
-    hint: "Tap or click a country on the map, then press Submit.",
-    input: { type: "map-select", placeholder: "Click a country on the map" },
+    prompt: `Find ${targetLabel} on the ${mapLabel} and select it.`,
+    hint: `Tap or click a ${itemSingular} on the map, then press Submit.`,
+    input: {
+      type: "map-select",
+      placeholder: `Click a ${itemSingular} on the map`,
+    },
     visuals: { layout: "none" },
     mapAssistPolicy: "required",
     worldAssist: toAssist(),
@@ -54,7 +59,7 @@ export function createMapSelectQuestion(
         return {
           correct: false,
           points: 0,
-          message: "Select a country on the world map first.",
+          message: `Select a ${itemSingular} on the ${mapLabel} first.`,
         };
       }
 
@@ -92,7 +97,7 @@ export function createMapSelectQuestion(
       const distanceKm = distanceLookup?.getDistanceKm(selected, target.iso2);
       if (Number.isFinite(distanceKm)) {
         this.worldAssist.fixedLabels = [
-          `Distance: ${distanceKm.toLocaleString()} km`,
+          `Border-to-border geodesic distance: ${distanceKm.toLocaleString()} km`,
         ];
       }
 
@@ -100,7 +105,7 @@ export function createMapSelectQuestion(
         correct: false,
         points: 0,
         message: Number.isFinite(distanceKm)
-          ? `Not quite. You chose ${selectedLabel}. You are ${distanceKm.toLocaleString()} km off, and ${answerLabel} is here.`
+          ? `Not quite. You chose ${selectedLabel}. Border-to-border geodesic distance: ${distanceKm.toLocaleString()} km, and ${answerLabel} is here.`
           : `Not quite. You chose ${selectedLabel}, and ${answerLabel} is here.`,
       };
     },
@@ -140,7 +145,7 @@ export function createMapSelectMode(data, rng = Math.random) {
         return null;
       }
       return createMapSelectQuestion(
-        target,
+        { ...target, meta: data?.meta || null },
         data.iso2ToCountry,
         distanceLookup,
       );

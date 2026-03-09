@@ -1,4 +1,9 @@
-import { drawOutline, loadGameData, normalize } from "./gameData.js";
+import {
+  drawOutline,
+  loadGameData,
+  loadUsStateData,
+  normalize,
+} from "./gameData.js";
 import { createMapAssistManager } from "./mapAssist.js";
 import {
   detectPlayerCountry,
@@ -62,6 +67,7 @@ const promptLabel = document.getElementById("promptLabel");
 const hintLabel = document.getElementById("hintLabel");
 const mapAssistRow = document.getElementById("mapAssistRow");
 const mapAssistToggle = document.getElementById("mapAssistToggle");
+const mapAssistToggleText = document.getElementById("mapAssistToggleText");
 const worldMapWrap = document.getElementById("worldMapWrap");
 const worldMapSvg = document.getElementById("worldMapSvg");
 const mapZoomInBtn = document.getElementById("mapZoomInBtn");
@@ -116,42 +122,36 @@ const modeCatalog = [
   {
     id: "daily-puzzle",
     title: "Competitive Mode",
-    desc: "A daily 5-question challenge with ranked leaderboard scoring.",
     iconClass: "fa-solid fa-trophy",
     build: (data) => createDailyPuzzleMode(data),
   },
   {
     id: "normal",
     title: "Normal Mode",
-    desc: "Classic country-outline guessing mode.",
     iconClass: "fa-solid fa-earth-americas",
     build: (data) => createNormalMode(data),
   },
   {
     id: "map-select",
     title: "Map Select",
-    desc: "Given a country name, click it on the world map and submit.",
     iconClass: "fa-solid fa-hand-pointer",
     build: (data) => createMapSelectMode(data),
   },
   {
     id: "region-chain",
     title: "Region Chain",
-    desc: "Build a valid 4-country border chain between two countries.",
     iconClass: "fa-solid fa-link",
     build: (data) => createRegionChainMode(data),
   },
   {
     id: "reverse-border",
     title: "Reverse Border",
-    desc: "You get neighboring countries as clues. Guess the target country.",
     iconClass: "fa-solid fa-puzzle-piece",
     build: (data) => createReverseBorderMode(data),
   },
   {
     id: "battle",
     title: "Battle Mode",
-    desc: "Two outlines face off. Pick which has more land neighbors.",
     iconClass: "fa-solid fa-scale-balanced",
     build: (data) => createBattleMode(data),
   },
@@ -159,12 +159,13 @@ const modeCatalog = [
 
 const state = {
   data: null,
+  usStateData: null,
   activeData: null,
   session: null,
   currentQuestion: null,
   selectedModeId: null,
   settings: {
-    continent: "All",
+    region: "all-countries",
   },
   deviceId: "",
   detectedCountry: null,
@@ -398,7 +399,7 @@ function getContinentOptions(data) {
   const set = new Set(
     data.countries.map((country) => country.continent).filter(Boolean),
   );
-  return ["All", ...[...set].sort((a, b) => a.localeCompare(b))];
+  return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 function buildFilteredData(data, continent) {
@@ -444,16 +445,109 @@ function buildFilteredData(data, continent) {
     countries,
     iso2ToCountry,
     aliasToIso2,
+    meta: {
+      ...data.meta,
+      regionLabel: continent,
+    },
   };
 }
 
-function updateActiveFilterLabel() {
-  activeContinentLabel.textContent = `Region: ${state.settings.continent}`;
-  activeContinentLabel.title = "Competitive Mode always uses All regions.";
+function getRegionOptions() {
+  const continents = getContinentOptions(state.data || { countries: [] });
+  return [
+    { value: "all-countries", label: "All Countries" },
+    ...continents.map((continent) => ({
+      value: `continent:${continent}`,
+      label: continent,
+    })),
+    { value: "us-states", label: "US States" },
+  ];
 }
 
-function getEffectiveContinentForMode(modeId) {
-  return modeId === COMPETITIVE_MODE_ID ? "All" : state.settings.continent;
+function buildActiveDataForRegion(regionValue) {
+  if (regionValue === "us-states") {
+    return state.usStateData;
+  }
+
+  if (String(regionValue || "").startsWith("continent:")) {
+    const continent = regionValue.slice("continent:".length);
+    return buildFilteredData(state.data, continent || "All");
+  }
+
+  return state.data;
+}
+
+function updateActiveFilterLabel() {
+  const selected = getRegionOptions().find(
+    (option) => option.value === state.settings.region,
+  );
+  activeContinentLabel.textContent = `Region: ${selected?.label || "All Countries"}`;
+  activeContinentLabel.title = "Competitive Mode always uses All Countries.";
+}
+
+function getEffectiveRegionForMode(modeId) {
+  return modeId === COMPETITIVE_MODE_ID ? "all-countries" : state.settings.region;
+}
+
+function getActiveVocabulary() {
+  const sourceData = state.activeData || state.data;
+  const singular = sourceData?.meta?.itemSingular || "country";
+  const plural = sourceData?.meta?.itemPlural || "countries";
+  const mapLabel = sourceData?.meta?.mapLabel || "world map";
+  return {
+    singular,
+    plural,
+    mapLabel,
+    singularTitle: singular.charAt(0).toUpperCase() + singular.slice(1),
+  };
+}
+
+function getModeCardVocabulary(modeId) {
+  // Competitive always uses the world-country pool regardless of settings.
+  if (modeId === COMPETITIVE_MODE_ID) {
+    const worldMeta = state.data?.meta || {};
+    return {
+      singular: worldMeta.itemSingular || "country",
+      plural: worldMeta.itemPlural || "countries",
+      mapLabel: worldMeta.mapLabel || "world map",
+    };
+  }
+
+  const previewData = buildActiveDataForRegion(state.settings.region) || state.data;
+  return {
+    singular: previewData?.meta?.itemSingular || "country",
+    plural: previewData?.meta?.itemPlural || "countries",
+    mapLabel: previewData?.meta?.mapLabel || "world map",
+  };
+}
+
+function getModeDescription(modeId) {
+  const { singular, plural, mapLabel } = getModeCardVocabulary(modeId);
+  switch (modeId) {
+    case COMPETITIVE_MODE_ID:
+      return "A daily 5-question challenge with ranked leaderboard scoring (All Countries only).";
+    case "normal":
+      return `Classic ${singular}-outline guessing mode.`;
+    case "map-select":
+      return `Given a ${singular} name, click it on the ${mapLabel} and submit.`;
+    case "region-chain":
+      return `Build a valid 4-${singular} border chain between two ${plural}.`;
+    case "reverse-border":
+      return `You get neighboring ${plural} as clues. Guess the target ${singular}.`;
+    case "battle":
+      return `Two ${singular} outlines face off. Pick which has more land neighbors.`;
+    default:
+      return "Play a geography challenge mode.";
+  }
+}
+
+function updateMapAssistLabel() {
+  if (!mapAssistToggleText) {
+    return;
+  }
+  const { mapLabel } = getActiveVocabulary();
+  mapAssistToggleText.textContent = `${mapLabel} assist`;
+  worldMapSvg.setAttribute("aria-label", `${mapLabel} helper`);
 }
 
 function setFeedback(message, kind = "") {
@@ -1174,7 +1268,9 @@ function renderModeCards() {
       state.competitive.localProgress?.dayKey === state.todayKey &&
       !state.competitive.localProgress?.completed;
     const lockedToday = isCompetitive && state.competitive.playedToday;
-    const description = isCompetitive ? getCompetitiveCardDetail() : mode.desc;
+    const description = isCompetitive
+      ? getCompetitiveCardDetail()
+      : getModeDescription(mode.id);
 
     if (isCompetitive) {
       if (lockedToday) {
@@ -1252,7 +1348,7 @@ function renderVisuals(visuals) {
     svg.setAttribute("viewBox", "0 0 640 380");
     svg.setAttribute("class", "mini-outline-svg");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", item.label || "Clue country outline");
+    svg.setAttribute("aria-label", item.label || "Clue outline");
 
     card.appendChild(svg);
     multiWrap.appendChild(card);
@@ -1336,7 +1432,7 @@ function shouldEnableCountryAutocomplete(input) {
   const hint = String(state.currentQuestion?.hint || "");
   const placeholder = String(input.placeholder || "");
   const context = `${prompt} ${hint} ${placeholder}`.toLowerCase();
-  return context.includes("country");
+  return /(country|state|province|territory|region|name)/.test(context);
 }
 
 function renderInput(input) {
@@ -1376,6 +1472,7 @@ function renderInput(input) {
   }
 
   if (input.type === "chain-builder") {
+    const { singular } = getActiveVocabulary();
     chainBuilderWrap.classList.remove("hidden");
     chainBuilderWrap.classList.add("without-inline-submit");
     secondaryActions.classList.add("paired-with-chain");
@@ -1383,9 +1480,10 @@ function renderInput(input) {
     submitBtn.textContent = "Submit Chain";
     chainInput1.value = "";
     chainInput2.value = "";
-    chainInput1.placeholder = input.placeholders?.[0] || "First middle country";
+    chainInput1.placeholder =
+      input.placeholders?.[0] || `First middle ${singular}`;
     chainInput2.placeholder =
-      input.placeholders?.[1] || "Second middle country";
+      input.placeholders?.[1] || `Second middle ${singular}`;
     chainPreview1.innerHTML = "";
     chainPreview2.innerHTML = "";
     chainPreviewCard1.classList.add("hidden");
@@ -1545,7 +1643,8 @@ function submitAnswer(rawAnswer) {
 
   if (!hasAnswer) {
     if (inputType === "map-select") {
-      setFeedback("Select a country on the world map first.", "wrong");
+      const { singular, mapLabel } = getActiveVocabulary();
+      setFeedback(`Select a ${singular} on the ${mapLabel} first.`, "wrong");
       return;
     }
 
@@ -1772,8 +1871,8 @@ async function startMode(modeId) {
     return;
   }
 
-  const effectiveContinent = getEffectiveContinentForMode(modeId);
-  state.activeData = buildFilteredData(state.data, effectiveContinent);
+  const effectiveRegion = getEffectiveRegionForMode(modeId);
+  state.activeData = buildActiveDataForRegion(effectiveRegion);
   state.selectedModeId = modeId;
   document.body.classList.toggle(
     "mode-reverse-border",
@@ -1826,6 +1925,8 @@ async function startMode(modeId) {
   submitBtn.disabled = false;
   answerInput.disabled = false;
 
+  updateMapAssistLabel();
+
   showQuestion();
 }
 
@@ -1848,6 +1949,7 @@ function backToModes() {
   setHeaderGameMeta(false);
   setHeaderModeLabel("");
   setSettingsOpen(false);
+  updateMapAssistLabel();
   renderModeCards();
 }
 
@@ -1859,7 +1961,7 @@ activeContinentLabel.setAttribute("role", "button");
 activeContinentLabel.setAttribute("tabindex", "0");
 activeContinentLabel.setAttribute(
   "aria-label",
-  "Open settings and change continent filter",
+  "Open settings and change region",
 );
 activeContinentLabel.addEventListener("click", () => {
   setSettingsOpen(true);
@@ -1882,8 +1984,9 @@ settingsOverlay.addEventListener("click", () => {
 });
 
 saveSettingsBtn.addEventListener("click", () => {
-  state.settings.continent = continentSelect.value || "All";
+  state.settings.region = continentSelect.value || "all-countries";
   updateActiveFilterLabel();
+  renderModeCards();
   setSettingsOpen(false);
 });
 
@@ -2077,17 +2180,28 @@ async function init() {
     countryAutocomplete.attachInput(chainInput1);
     countryAutocomplete.attachInput(chainInput2);
 
-    state.data = await loadGameData();
-    const options = getContinentOptions(state.data);
+    const [worldData, usStateData] = await Promise.all([
+      loadGameData(),
+      loadUsStateData(),
+    ]);
+    state.data = worldData;
+    state.usStateData = usStateData;
+
+    const options = getRegionOptions();
     continentSelect.innerHTML = "";
-    options.forEach((continent) => {
+    options.forEach((region) => {
       const option = document.createElement("option");
-      option.value = continent;
-      option.textContent = continent;
+      option.value = region.value;
+      option.textContent = region.label;
       continentSelect.appendChild(option);
     });
-    continentSelect.value = state.settings.continent;
+    continentSelect.value = state.settings.region;
+    if (!continentSelect.value) {
+      state.settings.region = "all-countries";
+      continentSelect.value = state.settings.region;
+    }
     updateActiveFilterLabel();
+    updateMapAssistLabel();
     renderOutlineBackdrop(state.data);
     setFeedback("");
     await refreshCompetitiveStateAndUi();

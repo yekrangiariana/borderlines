@@ -5,6 +5,8 @@ import { createCyclingPicker } from "./randomCycle.js";
 const ROUNDS = 10;
 
 export function createReverseBorderQuestion(data, target, rng) {
+  const itemSingular = data?.meta?.itemSingular || "country";
+  const itemPlural = data?.meta?.itemPlural || "countries";
   const clueIso2 = shuffle([...target.neighbors], rng).slice(0, 3);
   const clues = clueIso2
     .map((iso2) => {
@@ -26,9 +28,9 @@ export function createReverseBorderQuestion(data, target, rng) {
   });
 
   return {
-    prompt: `Which country borders all of these countries: ${clues.join(", ")}?`,
-    hint: "The clue-country outlines are shown below. Toggle map assist on if you want extra help.",
-    input: { type: "text", placeholder: "Type country" },
+    prompt: `Which ${itemSingular} borders all of these ${itemPlural}: ${clues.join(", ")}?`,
+    hint: `The clue ${itemPlural} outlines are shown below. Toggle map assist on if you want extra help.`,
+    input: { type: "text", placeholder: `Type ${itemSingular}` },
     visuals: { layout: "multi", items: clueItems },
     mapAssistDefaultOn: false,
     worldAssist: {
@@ -42,7 +44,11 @@ export function createReverseBorderQuestion(data, target, rng) {
     submit(rawAnswer) {
       const guess = normalize(rawAnswer || "");
       if (!guess) {
-        return { correct: false, points: 0, message: "Enter a country name." };
+        return {
+          correct: false,
+          points: 0,
+          message: `Enter a ${itemSingular} name.`,
+        };
       }
 
       if (target.aliases.has(guess)) {

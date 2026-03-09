@@ -149,7 +149,7 @@ export function createCountryAutocompleteManager(options = {}) {
 
     const container = document.createElement("div");
     container.className = "country-suggest-bar hidden";
-    container.setAttribute("aria-label", "Country name suggestions");
+    container.setAttribute("aria-label", "Name suggestions");
     container.setAttribute("role", "listbox");
 
     if (inputEl.parentElement) {

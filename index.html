@@ -36,7 +36,7 @@
         </div>
         <div class="header-utility-row">
           <p id="activeContinentLabel" class="active-filter">
-            Continent filter: All
+            Region: All Countries
           </p>
           <button
             id="openSettingsBtn"
@@ -56,12 +56,12 @@
           <h2>Choose Mode</h2>
         </div>
         <p id="headerDescription">
-          Pick a game mode and play with country outlines and real border data.
+          Pick a game mode and play with outline maps and real border data.
         </p>
         <div id="modeCards" class="mode-cards"></div>
         <p class="source-note">
-          Data sources: Natural Earth country outlines and GeoDataSource country
-          borders.
+          Data sources: Natural Earth country outlines, US Atlas state outlines,
+          and GeoDataSource country borders.
         </p>
       </section>
 
@@ -80,7 +80,9 @@
         <h3 id="settingsTitle">Game Settings</h3>
         <label for="continentSelect" class="settings-label">Region</label>
         <select id="continentSelect"></select>
-        <p class="settings-note">Competitive uses the global pool (All).</p>
+        <p class="settings-note">
+          Competitive always uses All Countries (continent and US States filters do not apply).
+        </p>
         <div class="settings-actions">
           <button id="saveSettingsBtn" type="button">Apply</button>
           <button id="closeSettingsBtn" type="button" class="ghost">
@@ -152,7 +154,9 @@
           <label class="assist-toggle" for="mapAssistToggle">
             <input id="mapAssistToggle" type="checkbox" />
             <span class="assist-toggle-ui" aria-hidden="true"></span>
-            <span class="assist-toggle-text">World map assist</span>
+            <span id="mapAssistToggleText" class="assist-toggle-text"
+              >Map assist</span
+            >
           </label>
         </div>
 
@@ -179,7 +183,7 @@
             id="worldMapSvg"
             viewBox="0 0 920 430"
             role="img"
-            aria-label="World map helper"
+            aria-label="Map helper"
           ></svg>
         </div>
 
@@ -216,7 +220,7 @@
         <div
           id="multiWrap"
           class="multi-wrap hidden"
-          aria-label="Clue country outlines"
+          aria-label="Clue outlines"
         ></div>
 
         <div id="textInputWrap" class="answer-row hidden">
@@ -314,6 +318,7 @@
     </main>
 
     <script src="./vendor/d3.v7.min.js"></script>
+    <script src="./vendor/topojson-client.min.js"></script>
     <script type="module" src="./js/app.js"></script>
   </body>
 </html>

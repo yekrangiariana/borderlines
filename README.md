@@ -1,18 +1,19 @@
 # Borderlines
 
-A local-first geography game using country outlines and neighboring-country data.
+A local-first geography game using country and US state outlines plus border-adjacency data.
 
 ## Modes
 
-- `Region Chain`: Build a valid 4-country border chain between two countries.
-- `Reverse Border`: Guess a country from a set of neighboring-country clues.
-- `Battle Mode`: Pick which of two country outlines has more land neighbors.
+- `Region Chain`: Build a valid 4-step border chain between two locations.
+- `Reverse Border`: Guess a location from neighboring-location clues.
+- `Battle Mode`: Pick which of two outlines has more land neighbors.
 - `Daily Puzzle`: A deterministic 5-question mixed set that changes daily.
 
 ## Settings
 
-- From the mode selection screen, open `Settings` and choose a continent filter.
-- The selected continent limits question generation and accepted answers across all modes.
+- From the mode selection screen, open `Settings` and choose a region.
+- Supported regions include `All Countries`, individual continents, and `US States`.
+- The selected region limits question generation and accepted answers across non-competitive modes.
 
 ## Run
 
@@ -155,10 +156,12 @@ For stricter anti-cheat, add a Supabase Edge Function that validates signed game
 ## Local Data Assets
 
 - `data/all_primary_countries.min.geojson` (country outlines)
+- `data/us_states_10m.json` (US states topology)
 - `data/GEODATASOURCE-COUNTRY-BORDERS.CSV` (border relationships)
 - `data/countries.csv` (country attributes)
 - `data/svgs/` and `data/svgs.zip` (WRI SVG map files)
 - `vendor/d3.v7.min.js` (vendored D3)
+- `vendor/topojson-client.min.js` (vendored TopoJSON client)
 
 ## Attribution
 

@@ -263,9 +263,14 @@ export function createMapAssistManager({
       features: focusedFeatures,
     };
 
-    const projection = d3.geoNaturalEarth1();
+    const isUsStatesDataset = sourceData?.meta?.id === "us-states";
+    const projection = isUsStatesDataset
+      ? d3.geoAlbersUsa()
+      : d3.geoNaturalEarth1();
     // Smaller precision keeps coastlines smoother when users zoom deeply.
-    projection.precision(0.35);
+    if (!isUsStatesDataset && projection.precision) {
+      projection.precision(0.35);
+    }
     const worldExtent = [
       [56, 30],
       [864, 400],

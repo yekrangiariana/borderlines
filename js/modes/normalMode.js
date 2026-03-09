@@ -5,12 +5,16 @@ import { createCyclingPicker } from "./randomCycle.js";
 const ROUNDS = 10;
 
 export function createNormalQuestion(target) {
+  const itemSingular = target?.meta?.itemSingular || "country";
   const targetLabel = formatCountryWithFlag(target.name, target.iso2);
 
   return {
-    prompt: "Identify this country outline.",
-    hint: "Type the country name.",
-    input: { type: "text", placeholder: "Country name" },
+    prompt: `Identify this ${itemSingular} outline.`,
+    hint: `Type the ${itemSingular} name.`,
+    input: {
+      type: "text",
+      placeholder: `${itemSingular.charAt(0).toUpperCase() + itemSingular.slice(1)} name`,
+    },
     visuals: { layout: "single", feature: target.feature },
     mapAssistPolicy: "disabled",
     submit(rawAnswer) {
@@ -51,7 +55,7 @@ export function createNormalMode(data, rng = Math.random) {
       if (!target) {
         return null;
       }
-      return createNormalQuestion(target);
+      return createNormalQuestion({ ...target, meta: data?.meta || null });
     },
   };
 }

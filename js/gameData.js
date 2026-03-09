@@ -14,12 +14,78 @@ const BORDERS_CSV_URL = new URL(
   "../data/GEODATASOURCE-COUNTRY-BORDERS.CSV",
   import.meta.url,
 );
+const US_STATES_TOPOLOGY_URL = new URL(
+  "../data/us_states_10m.json",
+  import.meta.url,
+);
 
 const BORDER_OVERRIDES = [["SG", "MY"]];
 
 const EXCLUDED_CONTINENTS = new Set(["Oceania", "Seven seas (open ocean)"]);
 
 const COUNTRY_NAME_OVERRIDES = new Map([["IL", "Palestine"]]);
+
+const EXCLUDED_US_FIPS = new Set([
+  "11", // District of Columbia
+  "60", // American Samoa
+  "66", // Guam
+  "69", // Northern Mariana Islands
+  "72", // Puerto Rico
+  "78", // US Virgin Islands
+]);
+
+const US_STATE_CODE_BY_FIPS = new Map([
+  ["01", "AL"],
+  ["02", "AK"],
+  ["04", "AZ"],
+  ["05", "AR"],
+  ["06", "CA"],
+  ["08", "CO"],
+  ["09", "CT"],
+  ["10", "DE"],
+  ["12", "FL"],
+  ["13", "GA"],
+  ["15", "HI"],
+  ["16", "ID"],
+  ["17", "IL"],
+  ["18", "IN"],
+  ["19", "IA"],
+  ["20", "KS"],
+  ["21", "KY"],
+  ["22", "LA"],
+  ["23", "ME"],
+  ["24", "MD"],
+  ["25", "MA"],
+  ["26", "MI"],
+  ["27", "MN"],
+  ["28", "MS"],
+  ["29", "MO"],
+  ["30", "MT"],
+  ["31", "NE"],
+  ["32", "NV"],
+  ["33", "NH"],
+  ["34", "NJ"],
+  ["35", "NM"],
+  ["36", "NY"],
+  ["37", "NC"],
+  ["38", "ND"],
+  ["39", "OH"],
+  ["40", "OK"],
+  ["41", "OR"],
+  ["42", "PA"],
+  ["44", "RI"],
+  ["45", "SC"],
+  ["46", "SD"],
+  ["47", "TN"],
+  ["48", "TX"],
+  ["49", "UT"],
+  ["50", "VT"],
+  ["51", "VA"],
+  ["53", "WA"],
+  ["54", "WV"],
+  ["55", "WI"],
+  ["56", "WY"],
+]);
 
 export function normalize(text) {
   return (text || "")
@@ -64,6 +130,15 @@ function ensureD3() {
     );
   }
   return globalThis.d3;
+}
+
+function ensureTopojson() {
+  if (!globalThis.topojson) {
+    throw new Error(
+      "TopoJSON client was not found. Ensure vendor/topojson-client.min.js is loaded first.",
+    );
+  }
+  return globalThis.topojson;
 }
 
 function hasRenderableGeometry(feature) {
@@ -249,6 +324,106 @@ export async function loadGameData() {
     countries,
     iso2ToCountry,
     aliasToIso2,
+    meta: {
+      id: "world-countries",
+      regionLabel: "All Countries",
+      itemSingular: "country",
+      itemPlural: "countries",
+      mapLabel: "world map",
+    },
+  };
+}
+
+export async function loadUsStateData() {
+  const topojson = ensureTopojson();
+
+  const topologyRes = await fetch(US_STATES_TOPOLOGY_URL);
+  if (!topologyRes.ok) {
+    throw new Error(`Failed to load US states outlines: ${topologyRes.status}`);
+  }
+
+  const topology = await topologyRes.json();
+  const allStateGeometries = topology?.objects?.states?.geometries || [];
+  const stateGeometries = allStateGeometries.filter((geometry) => {
+    const fips = String(geometry?.id || "").padStart(2, "0");
+    const code = US_STATE_CODE_BY_FIPS.get(fips);
+    return Boolean(code) && !EXCLUDED_US_FIPS.has(fips);
+  });
+
+  const stateCollection = {
+    type: "GeometryCollection",
+    geometries: stateGeometries,
+  };
+  const geojson = topojson.feature(topology, stateCollection);
+  const neighborsByIndex = topojson.neighbors(stateGeometries);
+
+  const countries = [];
+  const iso2ToCountry = new Map();
+  const aliasToIso2 = new Map();
+
+  geojson.features.forEach((feature, index) => {
+    const geometry = stateGeometries[index];
+    const fips = String(geometry?.id || "").padStart(2, "0");
+    const stateCode = US_STATE_CODE_BY_FIPS.get(fips);
+    const stateName = String(feature?.properties?.name || "").trim();
+    if (!stateCode || !stateName || !hasRenderableGeometry(feature)) {
+      return;
+    }
+
+    const iso2 = `US-${stateCode}`;
+    const aliases = new Set([
+      normalize(stateName),
+      normalize(stateCode),
+      normalize(`state of ${stateName}`),
+    ]);
+
+    const entry = {
+      iso2,
+      iso3: stateCode,
+      name: stateName,
+      continent: "United States",
+      feature,
+      aliases,
+      neighbors: new Set(),
+    };
+
+    countries.push(entry);
+    iso2ToCountry.set(iso2, entry);
+    aliases.forEach((alias) => {
+      if (alias && !aliasToIso2.has(alias)) {
+        aliasToIso2.set(alias, iso2);
+      }
+    });
+  });
+
+  countries.forEach((state, index) => {
+    const neighborIndices = neighborsByIndex[index] || [];
+    neighborIndices.forEach((neighborIndex) => {
+      const neighbor = countries[neighborIndex];
+      if (neighbor?.iso2 && neighbor.iso2 !== state.iso2) {
+        state.neighbors.add(neighbor.iso2);
+      }
+    });
+  });
+
+  countries.forEach((state) => {
+    state.neighborNames = [...state.neighbors]
+      .map((iso2) => iso2ToCountry.get(iso2)?.name)
+      .filter(Boolean)
+      .sort();
+  });
+
+  return {
+    countries,
+    iso2ToCountry,
+    aliasToIso2,
+    meta: {
+      id: "us-states",
+      regionLabel: "US States",
+      itemSingular: "state",
+      itemPlural: "states",
+      mapLabel: "country map",
+    },
   };
 }
 

@@ -5,6 +5,9 @@ import { createCyclingPicker } from "./randomCycle.js";
 const ROUNDS = 10;
 
 function buildChainQuestion(data, rng, startPicker, attemptLimit = 120) {
+  const itemSingular = data?.meta?.itemSingular || "country";
+  const itemPlural = data?.meta?.itemPlural || "countries";
+
   for (let attempt = 0; attempt < attemptLimit; attempt += 1) {
     const start = startPicker.nextWhere(
       (country) => country.neighbors.size >= 2,
@@ -45,11 +48,14 @@ function buildChainQuestion(data, rng, startPicker, attemptLimit = 120) {
     const correctPair = `${mid1.name}, ${mid2.name}`;
 
     return {
-      prompt: `Fill in the two missing countries: ${startLabel} -> ? -> ? -> ${endLabel}`,
-      hint: "Type the two middle countries in order.",
+      prompt: `Fill in the two missing ${itemPlural}: ${startLabel} -> ? -> ? -> ${endLabel}`,
+      hint: `Type the two middle ${itemPlural} in order.`,
       input: {
         type: "chain-builder",
-        placeholders: ["First middle country", "Second middle country"],
+        placeholders: [
+          `First middle ${itemSingular}`,
+          `Second middle ${itemSingular}`,
+        ],
       },
       visuals: {
         layout: "duel",
@@ -85,7 +91,7 @@ function buildChainQuestion(data, rng, startPicker, attemptLimit = 120) {
           return {
             correct: false,
             points: 0,
-            message: `Wrong. Enter exactly two middle countries. Correct answer: ${correctPair}.`,
+            message: `Wrong. Enter exactly two middle ${itemPlural}. Correct answer: ${correctPair}.`,
           };
         }
 
@@ -96,7 +102,7 @@ function buildChainQuestion(data, rng, startPicker, attemptLimit = 120) {
           return {
             correct: false,
             points: 0,
-            message: `Wrong. One or more country names were not recognized. Correct answer: ${correctPair}.`,
+            message: `Wrong. One or more ${itemSingular} names were not recognized. Correct answer: ${correctPair}.`,
           };
         }
 
