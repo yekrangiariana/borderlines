@@ -1,0 +1,6 @@
+# Local machine/system files
+.DS_Store
+.venv/
+
+# Local Android APK instructions (not for repo)
+APK_LOCAL_SETUP.md

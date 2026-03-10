@@ -15,7 +15,7 @@ The experience is designed to feel fast, clean, and replayable: pick a mode, sol
 
 ## Regions
 
-Game content can be filtered by region sets such as:
+Game content can be filtered by regithon sets such as:
 
 - All Countries
 - Continents
