@@ -36,6 +36,18 @@
     overflow: visible;
   }
 
+  body.progress-view {
+    height: auto;
+    min-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.progress-view .app {
+    min-height: max-content;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+
   .top-nav-row {
     margin: 0;
   }

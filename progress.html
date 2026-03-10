@@ -4,6 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Borderlines Progress</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com" />
+    <style>
+      @media (max-width: 780px) {
+        #openProgressBtn .settings-btn-label,
+        #openSettingsBtn .settings-btn-label {
+          display: none;
+        }
+
+        .header-actions > button.ghost {
+          width: 44px;
+          min-width: 44px;
+          height: 44px;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+      }
+    </style>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
@@ -60,9 +80,6 @@
       </header>
 
       <section class="card mode-select">
-        <div class="mode-select-head">
-          <h2>Outline Progress</h2>
-        </div>
         <section
           id="settingsProgressPanel"
           class="settings-progress-panel"

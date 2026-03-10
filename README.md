@@ -23,6 +23,20 @@ python3 -m http.server 8000
 
 Open `http://localhost:8000`.
 
+## Data Build (Preprocessed Indexes)
+
+World startup now uses preprocessed indexes for faster initial load:
+
+- `data/world_minimal.json` (lightweight country metadata + aliases)
+- `data/world_adjacency.json` (prebuilt border graph)
+- `data/cache_manifest.json` (build fingerprint used to invalidate stale IndexedDB cache)
+
+Regenerate these files whenever source world geometry/border data changes:
+
+```bash
+node ./scripts/buildWorldIndexes.mjs
+```
+
 ## Competitive Mixed Mode (Supabase Leaderboard)
 
 You can keep hosting the frontend on GitHub Pages and use Supabase for leaderboard storage.
@@ -161,7 +175,11 @@ For stricter anti-cheat, add a Supabase Edge Function that validates signed game
 - `data/finland_admin_areas.geojson` (Finland admin areas)
 - `data/GEODATASOURCE-COUNTRY-BORDERS.CSV` (border relationships)
 - `data/countries.csv` (country attributes)
+- `data/world_minimal.json` (preprocessed world metadata)
+- `data/world_adjacency.json` (preprocessed world adjacency)
+- `data/cache_manifest.json` (cache build fingerprint)
 - `data/svgs/` and `data/svgs.zip` (WRI SVG map files)
+- `scripts/buildWorldIndexes.mjs` (rebuilds preprocessed world indexes)
 - `vendor/d3.v7.min.js` (vendored D3)
 - `vendor/topojson-client.min.js` (vendored TopoJSON client)
 

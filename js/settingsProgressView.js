@@ -5,12 +5,6 @@ function toPercent(part, total) {
   return Math.max(0, Math.min(100, Math.round((part / total) * 100)));
 }
 
-function getRegionLabel(regionValue, getRegionOptions) {
-  const options = getRegionOptions();
-  const match = options.find((option) => option.value === regionValue);
-  return match?.label || "Current Region";
-}
-
 function createProgressCardMarkup(label, playedCount, totalCount) {
   const percent = toPercent(playedCount, totalCount);
   const circumference = 2 * Math.PI * 16;
@@ -23,7 +17,6 @@ function createProgressCardMarkup(label, playedCount, totalCount) {
         <div class="sp-region-copy">
           <strong>${label}</strong>
           <span>${playedCount}/${totalCount}</span>
-          <p>${percent}% complete</p>
         </div>
         <div class="sp-pie-wrap" aria-hidden="true">
           <svg class="sp-pie" viewBox="0 0 40 40">
@@ -97,11 +90,9 @@ export function createSettingsProgressView({
   function render() {
     const regionValue = getPreviewRegionValue();
     const regionOptions = getRegionOptions();
-    const regionLabel = getRegionLabel(regionValue, getRegionOptions);
     const current = getProgressForRegion(regionValue);
 
     const allRegionCards = regionOptions
-      .filter((option) => option.value !== "all-countries")
       .map((option) => {
         const stats = getProgressForRegion(option.value);
         return createProgressCardMarkup(
@@ -160,31 +151,28 @@ export function createSettingsProgressView({
     const canStartPlayedQuiz = current.playedCount >= 5;
 
     rootEl.innerHTML = `
-      <div class="sp-head">
-        <h4>Outline Progress</h4>
-        <p>${regionLabel}: ${current.playedCount}/${current.totalCount} played</p>
-      </div>
-      <div class="sp-progress-bar large" role="presentation">
-        <span style="width:${toPercent(current.playedCount, current.totalCount)}%"></span>
-      </div>
-      <div class="sp-cta-row">
-        <button id="startPlayedQuizBtn" type="button" ${canStartPlayedQuiz ? "" : "disabled"}>Quiz Me On Played</button>
-      </div>
-      <div class="sp-region-picker">
-        <label for="progressRegionSelect">Region</label>
-        <select id="progressRegionSelect" class="sp-region-select">${regionOptionsMarkup}</select>
+      <div class="sp-controls-row">
+        <div class="sp-region-picker">
+          <label for="progressRegionSelect">Region</label>
+          <p class="sp-region-help">Filter progress and quiz-by-played to a specific map set.</p>
+          <select id="progressRegionSelect" class="sp-region-select">${regionOptionsMarkup}</select>
+        </div>
+        <button id="startPlayedQuizBtn" class="sp-quiz-btn" type="button" ${canStartPlayedQuiz ? "" : "disabled"}>
+          <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+          <span>Quiz me on played</span>
+        </button>
       </div>
       <div class="sp-status ${statusKind}">${statusMessage || ""}</div>
       <details class="sp-section" open>
-        <summary>Played Carousel</summary>
+        <summary>Played Outlines</summary>
         <div class="sp-carousel" id="playedCarousel">${playedCards}</div>
       </details>
       <details class="sp-section" open>
-        <summary>Unplayed To Collect</summary>
+        <summary>Outlines To Collect</summary>
         <div class="sp-carousel">${unplayedCards}</div>
       </details>
       <section class="sp-section sp-region-progress" aria-label="Region Progress">
-        <h5>Region Progress</h5>
+        <h5>Progress</h5>
         <div class="sp-region-grid">${allRegionCards}</div>
       </section>
     `;

@@ -1,7 +1,8 @@
 import {
   drawOutline,
   loadFinlandAreaData,
-  loadGameData,
+  loadWorldGameDataFull,
+  loadWorldGameDataMinimal,
   loadUkAreaData,
   loadUsStateData,
 } from "./gameData.js";
@@ -21,7 +22,15 @@ const state = {
   ukAreaData: null,
   finlandAreaData: null,
   region: "all-countries",
+  deferredLoads: {
+    worldFull: null,
+    usStates: null,
+    ukAreas: null,
+    finlandAreas: null,
+  },
 };
+
+let progressView = null;
 
 function getContinentOptions(data) {
   const set = new Set(
@@ -113,6 +122,120 @@ function buildActiveDataForRegion(regionValue) {
   }
 
   return state.data;
+}
+
+function loadWorldDataFullDeferred() {
+  if (state.data?.meta?.fullData) {
+    return Promise.resolve(state.data);
+  }
+
+  if (!state.deferredLoads.worldFull) {
+    state.deferredLoads.worldFull = loadWorldGameDataFull()
+      .then((data) => {
+        state.data = data;
+        if (progressView) {
+          renderOutlineBackdrop(state.data);
+          progressView.render();
+        }
+        return data;
+      })
+      .catch((error) => {
+        state.deferredLoads.worldFull = null;
+        throw error;
+      });
+  }
+
+  return state.deferredLoads.worldFull;
+}
+
+function loadUsStateDataDeferred() {
+  if (state.usStateData) {
+    return Promise.resolve(state.usStateData);
+  }
+  if (!state.deferredLoads.usStates) {
+    state.deferredLoads.usStates = loadUsStateData()
+      .then((data) => {
+        state.usStateData = data;
+        progressView?.render();
+        return data;
+      })
+      .catch((error) => {
+        state.deferredLoads.usStates = null;
+        throw error;
+      });
+  }
+  return state.deferredLoads.usStates;
+}
+
+function loadUkAreaDataDeferred() {
+  if (state.ukAreaData) {
+    return Promise.resolve(state.ukAreaData);
+  }
+  if (!state.deferredLoads.ukAreas) {
+    state.deferredLoads.ukAreas = loadUkAreaData()
+      .then((data) => {
+        state.ukAreaData = data;
+        progressView?.render();
+        return data;
+      })
+      .catch((error) => {
+        state.deferredLoads.ukAreas = null;
+        throw error;
+      });
+  }
+  return state.deferredLoads.ukAreas;
+}
+
+function loadFinlandAreaDataDeferred() {
+  if (state.finlandAreaData) {
+    return Promise.resolve(state.finlandAreaData);
+  }
+  if (!state.deferredLoads.finlandAreas) {
+    state.deferredLoads.finlandAreas = loadFinlandAreaData()
+      .then((data) => {
+        state.finlandAreaData = data;
+        progressView?.render();
+        return data;
+      })
+      .catch((error) => {
+        state.deferredLoads.finlandAreas = null;
+        throw error;
+      });
+  }
+  return state.deferredLoads.finlandAreas;
+}
+
+async function ensureRegionDataLoaded(regionValue) {
+  if (String(regionValue || "").startsWith("continent:")) {
+    await loadWorldDataFullDeferred();
+    return;
+  }
+
+  if (regionValue === "us-states") {
+    await loadUsStateDataDeferred();
+    return;
+  }
+
+  if (regionValue === "uk-areas") {
+    await loadUkAreaDataDeferred();
+    return;
+  }
+
+  if (regionValue === "finland-areas") {
+    await loadFinlandAreaDataDeferred();
+    return;
+  }
+
+  await loadWorldDataFullDeferred();
+}
+
+function warmDeferredProgressDatasets() {
+  setTimeout(() => {
+    void loadWorldDataFullDeferred();
+    void loadUsStateDataDeferred();
+    void loadUkAreaDataDeferred();
+    void loadFinlandAreaDataDeferred();
+  }, 0);
 }
 
 function createBackdropToken(country) {
@@ -219,23 +342,15 @@ async function init() {
   });
 
   openSettingsBtn?.addEventListener("click", () => {
-    window.location.href = "./index.html";
+    window.location.href = "./index.html?openSettings=1";
   });
 
-  const [worldData, usStateData, ukAreaData, finlandAreaData] =
-    await Promise.all([
-      loadGameData(),
-      loadUsStateData(),
-      loadUkAreaData(),
-      loadFinlandAreaData(),
-    ]);
+  settingsProgressPanel.innerHTML =
+    '<p class="sp-empty">Loading progress data...</p>';
 
-  state.data = worldData;
-  state.usStateData = usStateData;
-  state.ukAreaData = ukAreaData;
-  state.finlandAreaData = finlandAreaData;
+  state.data = await loadWorldGameDataMinimal();
 
-  const progressView = createSettingsProgressView({
+  progressView = createSettingsProgressView({
     rootEl: settingsProgressPanel,
     drawOutline,
     getRegionOptions,
@@ -261,19 +376,29 @@ async function init() {
       });
       window.location.href = `./index.html?${params.toString()}`;
     },
-    onRegionChange: (nextRegion) => {
+    onRegionChange: async (nextRegion) => {
       state.region = nextRegion || "all-countries";
-      progressView.setMessage("");
-      progressView.render();
+      progressView.setMessage("Loading region data...");
+      try {
+        await ensureRegionDataLoaded(state.region);
+        progressView.setMessage("");
+      } catch (error) {
+        console.error(error);
+        progressView.setMessage(
+          "Could not load selected region data. Please try again.",
+          "wrong",
+        );
+      }
+      progressView?.render();
     },
   });
 
-  renderOutlineBackdrop(state.data);
   progressView.render();
+  warmDeferredProgressDatasets();
 }
 
 window.addEventListener("resize", () => {
-  if (state.data) {
+  if (state.data?.meta?.fullData) {
     renderOutlineBackdrop(state.data);
   }
 });

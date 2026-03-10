@@ -4,6 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Borderlines Modes</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com" />
+    <style>
+      @media (max-width: 780px) {
+        #openProgressBtn .settings-btn-label,
+        #openSettingsBtn .settings-btn-label {
+          display: none;
+        }
+
+        .header-actions > button.ghost {
+          width: 44px;
+          min-width: 44px;
+          height: 44px;
+          padding: 0;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+      }
+    </style>
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
@@ -16,7 +36,7 @@
     <link rel="stylesheet" href="./home.css" />
     <link rel="stylesheet" href="./mobile.css" media="(max-width: 780px)" />
   </head>
-  <body>
+  <body class="home-view">
     <div id="outlineBackdrop" class="outline-backdrop" aria-hidden="true"></div>
     <div class="bg-shape bg-shape-1" aria-hidden="true"></div>
     <div class="bg-shape bg-shape-2" aria-hidden="true"></div>
@@ -69,7 +89,14 @@
         <p id="headerDescription">
           Pick a game mode and play with outline maps and real border data.
         </p>
-        <div id="modeCards" class="mode-cards"></div>
+        <div id="modeCards" class="mode-cards is-loading" aria-live="polite">
+          <div class="mode-card-skeleton" aria-hidden="true"></div>
+          <div class="mode-card-skeleton" aria-hidden="true"></div>
+          <div class="mode-card-skeleton" aria-hidden="true"></div>
+          <div class="mode-card-skeleton" aria-hidden="true"></div>
+          <div class="mode-card-skeleton" aria-hidden="true"></div>
+          <div class="mode-card-skeleton" aria-hidden="true"></div>
+        </div>
       </section>
 
       <div

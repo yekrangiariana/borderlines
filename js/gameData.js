@@ -10,8 +10,16 @@ const AUDIT_OVERRIDES_URL = new URL(
   "../data/geometry_overrides_audit.geojson",
   import.meta.url,
 );
-const BORDERS_CSV_URL = new URL(
-  "../data/GEODATASOURCE-COUNTRY-BORDERS.CSV",
+const WORLD_MINIMAL_URL = new URL(
+  "../data/world_minimal.json",
+  import.meta.url,
+);
+const WORLD_ADJACENCY_URL = new URL(
+  "../data/world_adjacency.json",
+  import.meta.url,
+);
+const DATA_CACHE_MANIFEST_URL = new URL(
+  "../data/cache_manifest.json",
   import.meta.url,
 );
 const US_STATES_TOPOLOGY_URL = new URL(
@@ -116,6 +124,17 @@ const FINLAND_REGION_NAME_BY_CODE = new Map([
   ["FI-19", "Varsinais-Suomi"],
 ]);
 
+const DATA_CACHE_DB_NAME = "borderlines-data-cache";
+const DATA_CACHE_DB_VERSION = 1;
+const DATA_CACHE_STORE = "json";
+const DATA_CACHE_VERSION_KEY = "schema-v1";
+const WORLD_MINIMAL_CACHE_KEY = "world-minimal";
+const WORLD_ADJACENCY_CACHE_KEY = "world-adjacency";
+const WORLD_FULL_CACHE_KEY = "world-full";
+const CACHE_MANIFEST_BUILD_KEY = "cache-manifest-build-id";
+
+let cacheVersionInitPromise = null;
+
 export function normalize(text) {
   return (text || "")
     .toLowerCase()
@@ -139,6 +158,207 @@ export function shuffle(items, rng = Math.random) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+function getCacheEntryKey(cacheKey) {
+  return `${DATA_CACHE_VERSION_KEY}:${cacheKey}`;
+}
+
+function hasIndexedDb() {
+  return typeof indexedDB !== "undefined";
+}
+
+function openDataCacheDb() {
+  if (!hasIndexedDb()) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DATA_CACHE_DB_NAME, DATA_CACHE_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DATA_CACHE_STORE)) {
+        db.createObjectStore(DATA_CACHE_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error("IndexedDB open failed"));
+  });
+}
+
+async function readCachedJson(cacheKey) {
+  const db = await openDataCacheDb();
+  if (!db) {
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DATA_CACHE_STORE, "readonly");
+    const store = tx.objectStore(DATA_CACHE_STORE);
+    const req = store.get(getCacheEntryKey(cacheKey));
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => reject(req.error || new Error("IndexedDB read failed"));
+  });
+}
+
+async function writeCachedJson(cacheKey, payload) {
+  const db = await openDataCacheDb();
+  if (!db) {
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DATA_CACHE_STORE, "readwrite");
+    const store = tx.objectStore(DATA_CACHE_STORE);
+    store.put(payload, getCacheEntryKey(cacheKey));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB write failed"));
+  });
+}
+
+async function clearDataCacheStore() {
+  const db = await openDataCacheDb();
+  if (!db) {
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DATA_CACHE_STORE, "readwrite");
+    const store = tx.objectStore(DATA_CACHE_STORE);
+    store.clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB clear failed"));
+  });
+}
+
+async function readCacheManifestBuildId() {
+  try {
+    const res = await fetch(DATA_CACHE_MANIFEST_URL, { cache: "no-store" });
+    if (!res.ok) {
+      return "";
+    }
+    const payload = await res.json();
+    return String(payload?.buildId || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function ensureDataCacheVersion() {
+  if (!hasIndexedDb()) {
+    return;
+  }
+
+  if (!cacheVersionInitPromise) {
+    cacheVersionInitPromise = (async () => {
+      const currentBuildId = await readCacheManifestBuildId();
+      if (!currentBuildId) {
+        return;
+      }
+
+      const cachedBuildId = String(
+        (await readCachedJson(CACHE_MANIFEST_BUILD_KEY)) || "",
+      ).trim();
+
+      if (cachedBuildId === currentBuildId) {
+        return;
+      }
+
+      await clearDataCacheStore();
+      await writeCachedJson(CACHE_MANIFEST_BUILD_KEY, currentBuildId);
+    })().catch(() => {
+      // Ignore cache invalidation failures and continue with network-backed loads.
+    });
+  }
+
+  await cacheVersionInitPromise;
+}
+
+async function fetchJsonWithCache(url, cacheKey) {
+  try {
+    const cached = await readCachedJson(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  } catch {
+    // Ignore cache read failures and fall back to network.
+  }
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to load dataset: ${res.status}`);
+  }
+  const parsed = await res.json();
+
+  try {
+    await writeCachedJson(cacheKey, parsed);
+  } catch {
+    // Ignore cache write failures.
+  }
+
+  return parsed;
+}
+
+function hydrateCountryRows(countryRows) {
+  return (countryRows || []).map((country) => ({
+    iso2: country.iso2,
+    iso3: country.iso3,
+    name: country.name,
+    continent: country.continent,
+    feature: country.feature || null,
+    aliases: new Set(country.aliases || []),
+    neighbors: new Set(country.neighbors || []),
+  }));
+}
+
+function buildDatasetFromCountries(countries, meta) {
+  const iso2ToCountry = new Map();
+  const aliasToIso2 = new Map();
+
+  countries.forEach((country) => {
+    iso2ToCountry.set(country.iso2, country);
+    country.aliases.forEach((alias) => {
+      if (!aliasToIso2.has(alias)) {
+        aliasToIso2.set(alias, country.iso2);
+      }
+    });
+  });
+
+  countries.forEach((country) => {
+    country.neighborNames = [...country.neighbors]
+      .map((iso2) => iso2ToCountry.get(iso2)?.name)
+      .filter(Boolean)
+      .sort();
+  });
+
+  return {
+    countries,
+    iso2ToCountry,
+    aliasToIso2,
+    meta,
+  };
+}
+
+function applyAdjacency(countries, adjacencyByIso2) {
+  const validIso = new Set(countries.map((country) => country.iso2));
+  countries.forEach((country) => {
+    const neighborList = adjacencyByIso2?.[country.iso2] || [];
+    country.neighbors = new Set(
+      neighborList.filter((iso2) => validIso.has(iso2)),
+    );
+  });
+}
+
+function serializeCountriesForCache(countries) {
+  return countries.map((country) => ({
+    iso2: country.iso2,
+    iso3: country.iso3,
+    name: country.name,
+    continent: country.continent,
+    feature: country.feature || null,
+    aliases: [...(country.aliases || [])],
+    neighbors: [...(country.neighbors || [])],
+  }));
 }
 
 function buildAliasSet(props) {
@@ -279,41 +499,47 @@ function buildNeighborMapBySharedSegments(items) {
   return neighborsById;
 }
 
-export async function loadGameData() {
-  const d3 = ensureD3();
+export async function loadWorldGameDataMinimal() {
+  await ensureDataCacheVersion();
 
-  const [geoRes, borderRes, supplementalRes, auditOverrideRes] =
+  const [minimalPayload, adjacencyPayload] = await Promise.all([
+    fetchJsonWithCache(WORLD_MINIMAL_URL, WORLD_MINIMAL_CACHE_KEY),
+    fetchJsonWithCache(WORLD_ADJACENCY_URL, WORLD_ADJACENCY_CACHE_KEY),
+  ]);
+
+  const countries = hydrateCountryRows(minimalPayload?.countries || []);
+  applyAdjacency(countries, adjacencyPayload?.adjacency || {});
+
+  return buildDatasetFromCountries(countries, {
+    ...(minimalPayload?.meta || {}),
+    fullData: false,
+  });
+}
+
+export async function loadWorldGameDataFull() {
+  await ensureDataCacheVersion();
+
+  try {
+    const cachedFull = await readCachedJson(WORLD_FULL_CACHE_KEY);
+    if (cachedFull?.countries?.length) {
+      const cachedCountries = hydrateCountryRows(cachedFull.countries);
+      return buildDatasetFromCountries(cachedCountries, {
+        ...(cachedFull.meta || {}),
+        fullData: true,
+      });
+    }
+  } catch {
+    // Ignore processed-cache read failures and rebuild.
+  }
+
+  const [geojson, supplementalGeojson, auditOverrideGeojson, adjacencyPayload] =
     await Promise.all([
-      fetch(GEOJSON_URL),
-      fetch(BORDERS_CSV_URL),
-      fetch(MISSING_GEOMETRIES_URL),
-      fetch(AUDIT_OVERRIDES_URL),
+      fetchJsonWithCache(GEOJSON_URL, "world-geojson"),
+      fetchJsonWithCache(MISSING_GEOMETRIES_URL, "world-missing-geojson"),
+      fetchJsonWithCache(AUDIT_OVERRIDES_URL, "world-audit-geojson"),
+      fetchJsonWithCache(WORLD_ADJACENCY_URL, WORLD_ADJACENCY_CACHE_KEY),
     ]);
 
-  if (!geoRes.ok) {
-    throw new Error(`Failed to load country outlines: ${geoRes.status}`);
-  }
-  if (!borderRes.ok) {
-    throw new Error(`Failed to load border dataset: ${borderRes.status}`);
-  }
-  if (!supplementalRes.ok) {
-    throw new Error(
-      `Failed to load missing geometries dataset: ${supplementalRes.status}`,
-    );
-  }
-  if (!auditOverrideRes.ok) {
-    throw new Error(
-      `Failed to load audit override geometry dataset: ${auditOverrideRes.status}`,
-    );
-  }
-
-  const [geojson, borderCsv, supplementalGeojson, auditOverrideGeojson] =
-    await Promise.all([
-      geoRes.json(),
-      borderRes.text(),
-      supplementalRes.json(),
-      auditOverrideRes.json(),
-    ]);
   const supplementalByIso3 = new Map();
   (supplementalGeojson.features || []).forEach((feature) => {
     const iso3 = (feature?.properties?.ADM0_A3 || "").toUpperCase();
@@ -331,22 +557,15 @@ export async function loadGameData() {
     }
     auditOverridesByIso2.set(iso2, feature);
   });
-  const borderRows = d3.csvParse(borderCsv);
 
   const countries = [];
-  const iso2ToCountry = new Map();
-  const aliasToIso2 = new Map();
 
   (geojson.features || []).forEach((feature) => {
     const props = feature.properties || {};
     const iso2 = (props.iso_a2 || "").toUpperCase();
     const iso3 = (props.iso_a3 || "").toUpperCase();
     const continent = props.continent || "Unknown";
-    if (!iso2) {
-      return;
-    }
-
-    if (EXCLUDED_CONTINENTS.has(continent)) {
+    if (!iso2 || EXCLUDED_CONTINENTS.has(continent)) {
       return;
     }
 
@@ -380,7 +599,8 @@ export async function loadGameData() {
     if (COUNTRY_NAME_OVERRIDES.has(iso2)) {
       aliases.add(normalize(displayName));
     }
-    const country = {
+
+    countries.push({
       iso2,
       iso3,
       name: displayName,
@@ -388,64 +608,34 @@ export async function loadGameData() {
       feature: featureForRender,
       aliases,
       neighbors: new Set(),
-    };
-
-    countries.push(country);
-    iso2ToCountry.set(iso2, country);
-    aliases.forEach((alias) => {
-      if (!aliasToIso2.has(alias)) {
-        aliasToIso2.set(alias, iso2);
-      }
     });
   });
 
-  borderRows.forEach((row) => {
-    const from = (row.country_code || "").trim().toUpperCase();
-    const to = (row.country_border_code || "").trim().toUpperCase();
-    if (!from || !to || from === to) {
-      return;
-    }
+  applyAdjacency(countries, adjacencyPayload?.adjacency || {});
 
-    const fromCountry = iso2ToCountry.get(from);
-    const toCountry = iso2ToCountry.get(to);
-    if (!fromCountry || !toCountry) {
-      return;
-    }
-
-    // Land borders are bidirectional; enforce graph symmetry.
-    fromCountry.neighbors.add(to);
-    toCountry.neighbors.add(from);
+  const dataset = buildDatasetFromCountries(countries, {
+    id: "world-countries",
+    regionLabel: "All Countries",
+    itemSingular: "country",
+    itemPlural: "countries",
+    mapLabel: "world map",
+    fullData: true,
   });
 
-  BORDER_OVERRIDES.forEach(([a, b]) => {
-    const left = iso2ToCountry.get(a);
-    const right = iso2ToCountry.get(b);
-    if (!left || !right) {
-      return;
-    }
-    left.neighbors.add(b);
-    right.neighbors.add(a);
-  });
+  try {
+    await writeCachedJson(WORLD_FULL_CACHE_KEY, {
+      meta: dataset.meta,
+      countries: serializeCountriesForCache(dataset.countries),
+    });
+  } catch {
+    // Ignore processed-cache write failures.
+  }
 
-  countries.forEach((country) => {
-    country.neighborNames = [...country.neighbors]
-      .map((iso2) => iso2ToCountry.get(iso2)?.name)
-      .filter(Boolean)
-      .sort();
-  });
+  return dataset;
+}
 
-  return {
-    countries,
-    iso2ToCountry,
-    aliasToIso2,
-    meta: {
-      id: "world-countries",
-      regionLabel: "All Countries",
-      itemSingular: "country",
-      itemPlural: "countries",
-      mapLabel: "world map",
-    },
-  };
+export async function loadGameData() {
+  return loadWorldGameDataFull();
 }
 
 export async function loadUsStateData() {

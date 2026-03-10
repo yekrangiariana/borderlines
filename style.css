@@ -63,8 +63,8 @@ body.name-modal-open {
 }
 
 body.progress-view {
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 body.legal-view {
@@ -148,6 +148,12 @@ body.legal-view {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.header-actions i.fa-solid {
+  display: inline-block;
+  width: 1.1em;
+  text-align: center;
 }
 
 body.progress-view .header-utility-row {
@@ -472,7 +478,6 @@ body.in-mode .header h1 {
 }
 
 #progressRegionSelect {
-  margin-bottom: 6px;
   border-color: rgba(201, 77, 16, 0.38);
   background: linear-gradient(180deg, #fff, #fffaf6);
 }
@@ -495,6 +500,43 @@ body.in-mode .header h1 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  align-content: start;
+  min-height: 360px;
+}
+
+.mode-cards.is-loading {
+  pointer-events: none;
+}
+
+.mode-card-skeleton {
+  min-height: 112px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.95) 30%,
+      rgba(242, 242, 239, 0.95) 50%,
+      rgba(255, 255, 255, 0.95) 70%
+    ),
+    linear-gradient(170deg, #ffffff, #fbfbf8);
+  background-size:
+    220% 100%,
+    100% 100%;
+  animation: mode-card-skeleton-shimmer 1.3s linear infinite;
+}
+
+@keyframes mode-card-skeleton-shimmer {
+  from {
+    background-position:
+      180% 0,
+      0 0;
+  }
+  to {
+    background-position:
+      -20% 0,
+      0 0;
+  }
 }
 
 .mode-card {
@@ -1402,6 +1444,10 @@ button.ghost.is-active {
   .mode-cards,
   .choice-wrap {
     grid-template-columns: 1fr;
+  }
+
+  .mode-cards {
+    min-height: 760px;
   }
 
   .duel-wrap {
