@@ -147,9 +147,9 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  .game-card {
-    /* padding-bottom: calc(188px + env(safe-area-inset-bottom)); */
-  }
+  /* .game-card {
+    padding-bottom: calc(188px + env(safe-area-inset-bottom));
+  } */
 
   #textInputWrap.docked-input {
     position: fixed;
