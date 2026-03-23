@@ -3,7 +3,8 @@
   body.home-view,
   body.in-mode,
   body.progress-view,
-  body.legal-view {
+  body.legal-view,
+  body.results-view {
     align-items: center;
     justify-content: center;
   }
@@ -11,7 +12,8 @@
   body.home-view .app,
   body.in-mode .app,
   body.progress-view .app,
-  body.legal-view .app {
+  body.legal-view .app,
+  body.results-view .app {
     margin-top: auto;
     margin-bottom: auto;
   }

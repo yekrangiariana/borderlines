@@ -1272,6 +1272,7 @@ function openCompetitiveResultCard() {
   setFeedback("");
   setHomeViewClass(false);
   setHeaderGameMeta(false);
+  document.body.classList.add("results-view");
   setHeaderModeLabel("Competitive Mode");
   updateMapAssistLabel();
 
@@ -2246,6 +2247,7 @@ function finishGame() {
   setHeaderGameMeta(false);
   headerDescription.classList.add("hidden");
   headerMeta.classList.add("hidden");
+  document.body.classList.add("results-view");
 
   const maxScore = state.session?.totalRounds || state.round || 0;
   renderFinalScoreSummary(state.score, maxScore);
@@ -2405,6 +2407,7 @@ function backToModes() {
   state.currentQuestion = null;
   state.selectedModeId = null;
   document.body.classList.remove("mode-reverse-border");
+  document.body.classList.remove("results-view");
 
   modeSelect.classList.remove("hidden");
   gameSection.classList.add("hidden");
