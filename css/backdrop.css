@@ -4,6 +4,7 @@
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+  contain: strict;
 }
 
 .outline-backdrop-row {
@@ -12,6 +13,7 @@
   width: 100%;
   overflow: hidden;
   opacity: 0.2;
+  contain: layout style;
 }
 
 .outline-backdrop-track {
@@ -21,6 +23,7 @@
   animation: backdrop-marquee var(--row-duration, 24s) linear infinite;
   animation-delay: var(--row-delay, 0s);
   will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 
 .outline-backdrop-row.reverse .outline-backdrop-track {
@@ -35,7 +38,6 @@
   border-radius: 5px;
   border: 1px solid rgba(25, 25, 25, 0.16);
   background: rgba(255, 255, 255, 0.38);
-  backdrop-filter: blur(0.4px);
 }
 
 .outline-backdrop-svg {
@@ -52,44 +54,59 @@
 
 @keyframes backdrop-marquee {
   0% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
 @media (min-width: 1280px) {
   .outline-backdrop-row {
-    opacity: 0.24;
+    opacity: 0.22;
   }
 
   .outline-backdrop-track {
-    gap: 18px;
+    gap: 24px;
   }
 
   .outline-backdrop-token {
-    padding: 4px 8px;
+    padding: 5px 10px;
   }
 
   .outline-backdrop-svg {
-    width: 138px;
-    height: 80px;
+    width: 180px;
+    height: 104px;
   }
 }
 
 @media (min-width: 1680px) {
   .outline-backdrop-row {
-    opacity: 0.28;
+    opacity: 0.24;
   }
 
   .outline-backdrop-track {
-    gap: 22px;
+    gap: 32px;
+  }
+
+  .outline-backdrop-token {
+    padding: 6px 12px;
   }
 
   .outline-backdrop-svg {
-    width: 170px;
-    height: 98px;
+    width: 240px;
+    height: 140px;
+  }
+}
+
+@media (min-width: 2200px) {
+  .outline-backdrop-track {
+    gap: 40px;
+  }
+
+  .outline-backdrop-svg {
+    width: 300px;
+    height: 175px;
   }
 }
 
@@ -110,4 +127,17 @@
     width: 76px;
     height: 44px;
   }
+}
+
+/* Pause animations when user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .outline-backdrop-track {
+    animation: none;
+  }
+}
+
+/* Pause animations when backdrop is hidden or page is not visible */
+.outline-backdrop.paused .outline-backdrop-track,
+.outline-backdrop[hidden] .outline-backdrop-track {
+  animation-play-state: paused;
 }

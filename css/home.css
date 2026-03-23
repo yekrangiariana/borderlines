@@ -1,13 +1,17 @@
 /* Home-only overrides for a compact newspaper puzzle vibe. */
 @media (min-width: 781px) {
   body.home-view,
-  body.in-mode {
+  body.in-mode,
+  body.progress-view,
+  body.legal-view {
     align-items: center;
     justify-content: center;
   }
 
   body.home-view .app,
-  body.in-mode .app {
+  body.in-mode .app,
+  body.progress-view .app,
+  body.legal-view .app {
     margin-top: auto;
     margin-bottom: auto;
   }

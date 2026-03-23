@@ -1,7 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./supabaseConfig.js";
+import { LEADERBOARD_API_URL } from "./supabaseConfig.js";
 
-const TABLE_NAME = "leaderboard_scores";
 const MODE_ID = "daily-puzzle";
 const NAME_MIN = 3;
 const NAME_MAX = 16;
@@ -67,21 +65,6 @@ function getRegionNameToCodeLookup() {
 
   regionNameToCodeLookup = lookup;
   return regionNameToCodeLookup;
-}
-
-let client;
-
-function getClient() {
-  if (client) {
-    return client;
-  }
-
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return null;
-  }
-
-  client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  return client;
 }
 
 export function getTodayDayKey() {
@@ -179,7 +162,7 @@ export function getOrCreateDeviceId() {
 }
 
 export function isLeaderboardEnabled() {
-  return Boolean(getClient());
+  return Boolean(LEADERBOARD_API_URL);
 }
 
 export function sanitizeDisplayName(rawName) {
@@ -216,8 +199,7 @@ export async function submitDailyScore({
   deviceId,
   playerCountry,
 }) {
-  const db = getClient();
-  if (!db) {
+  if (!LEADERBOARD_API_URL) {
     return {
       ok: false,
       disabled: true,
@@ -241,44 +223,35 @@ export async function submitDailyScore({
     return { ok: false, message: "Missing device identifier." };
   }
 
-  const dayKey = getTodayDayKey();
+  try {
+    const response = await fetch(`${LEADERBOARD_API_URL}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        displayName: nameResult.value,
+        score: numericScore,
+        maxScore: numericMax,
+        continent: String(continent || "All"),
+        deviceId: cleanDeviceId,
+        playerCountry:
+          playerCountry && /^[A-Za-z]{2}$/.test(String(playerCountry))
+            ? String(playerCountry).toUpperCase()
+            : null,
+      }),
+    });
 
-  const payload = {
-    mode_id: MODE_ID,
-    day_key: dayKey,
-    display_name: nameResult.value,
-    device_id: cleanDeviceId,
-    player_country:
-      playerCountry && /^[A-Za-z]{2}$/.test(String(playerCountry))
-        ? String(playerCountry).toUpperCase()
-        : null,
-    score: numericScore,
-    max_score: numericMax,
-    continent: String(continent || "All"),
-  };
-
-  const { error } = await db.from(TABLE_NAME).insert(payload);
-
-  if (error) {
-    if (error.code === "23505") {
-      return {
-        ok: false,
-        alreadyPlayed: true,
-        message: "You already played today's Competitive Mode.",
-      };
-    }
+    const result = await response.json();
+    return result;
+  } catch (error) {
     return {
       ok: false,
       message: `Could not submit score: ${error.message}`,
     };
   }
-
-  return { ok: true };
 }
 
 export async function fetchDailyLeaderboard(limit = 20) {
-  const db = getClient();
-  if (!db) {
+  if (!LEADERBOARD_API_URL) {
     return {
       ok: false,
       disabled: true,
@@ -287,32 +260,21 @@ export async function fetchDailyLeaderboard(limit = 20) {
     };
   }
 
-  const dayKey = getTodayDayKey();
-  const { data, error } = await db
-    .from(TABLE_NAME)
-    .select(
-      "display_name, score, max_score, continent, played_at, player_country, device_id",
-    )
-    .eq("mode_id", MODE_ID)
-    .eq("day_key", dayKey)
-    .order("score", { ascending: false })
-    .order("played_at", { ascending: true })
-    .limit(limit);
-
-  if (error) {
+  try {
+    const response = await fetch(`${LEADERBOARD_API_URL}/daily?limit=${limit}`);
+    const result = await response.json();
+    return result;
+  } catch (error) {
     return {
       ok: false,
       message: `Could not load leaderboard: ${error.message}`,
       rows: [],
     };
   }
-
-  return { ok: true, rows: data || [] };
 }
 
 export async function fetchWeeklyLeaderboard(limit = 20) {
-  const db = getClient();
-  if (!db) {
+  if (!LEADERBOARD_API_URL) {
     return {
       ok: false,
       disabled: true,
@@ -321,36 +283,23 @@ export async function fetchWeeklyLeaderboard(limit = 20) {
     };
   }
 
-  const now = new Date();
-  const weekStart = new Date(now);
-  weekStart.setUTCDate(now.getUTCDate() - 6);
-  weekStart.setUTCHours(0, 0, 0, 0);
-
-  const { data, error } = await db
-    .from(TABLE_NAME)
-    .select(
-      "display_name, score, max_score, continent, played_at, player_country, device_id",
-    )
-    .eq("mode_id", MODE_ID)
-    .gte("played_at", weekStart.toISOString())
-    .order("score", { ascending: false })
-    .order("played_at", { ascending: true })
-    .limit(limit);
-
-  if (error) {
+  try {
+    const response = await fetch(
+      `${LEADERBOARD_API_URL}/weekly?limit=${limit}`,
+    );
+    const result = await response.json();
+    return result;
+  } catch (error) {
     return {
       ok: false,
       message: `Could not load leaderboard: ${error.message}`,
       rows: [],
     };
   }
-
-  return { ok: true, rows: data || [] };
 }
 
 export async function hasPlayedCompetitiveToday(deviceId) {
-  const db = getClient();
-  if (!db) {
+  if (!LEADERBOARD_API_URL) {
     return {
       ok: false,
       disabled: true,
@@ -364,29 +313,23 @@ export async function hasPlayedCompetitiveToday(deviceId) {
     return { ok: false, message: "Missing device identifier.", played: false };
   }
 
-  const dayKey = getTodayDayKey();
-  const { count, error } = await db
-    .from(TABLE_NAME)
-    .select("id", { count: "exact", head: true })
-    .eq("mode_id", MODE_ID)
-    .eq("day_key", dayKey)
-    .eq("device_id", cleanDeviceId)
-    .limit(1);
-
-  if (error) {
+  try {
+    const response = await fetch(
+      `${LEADERBOARD_API_URL}/check?deviceId=${encodeURIComponent(cleanDeviceId)}`,
+    );
+    const result = await response.json();
+    return result;
+  } catch (error) {
     return {
       ok: false,
       message: `Could not check daily eligibility: ${error.message}`,
       played: false,
     };
   }
-
-  return { ok: true, played: (count || 0) > 0 };
 }
 
 export async function fetchMyCompetitiveRunToday(deviceId) {
-  const db = getClient();
-  if (!db) {
+  if (!LEADERBOARD_API_URL) {
     return {
       ok: false,
       disabled: true,
@@ -400,22 +343,17 @@ export async function fetchMyCompetitiveRunToday(deviceId) {
     return { ok: false, message: "Missing device identifier.", row: null };
   }
 
-  const dayKey = getTodayDayKey();
-  const { data, error } = await db
-    .from(TABLE_NAME)
-    .select("score, max_score, played_at, display_name, player_country")
-    .eq("mode_id", MODE_ID)
-    .eq("day_key", dayKey)
-    .eq("device_id", cleanDeviceId)
-    .maybeSingle();
-
-  if (error) {
+  try {
+    const response = await fetch(
+      `${LEADERBOARD_API_URL}/my-run?deviceId=${encodeURIComponent(cleanDeviceId)}`,
+    );
+    const result = await response.json();
+    return result;
+  } catch (error) {
     return {
       ok: false,
       message: `Could not load today's run: ${error.message}`,
       row: null,
     };
   }
-
-  return { ok: true, row: data || null };
 }
