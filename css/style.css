@@ -10,9 +10,7 @@
   --correct: #1a7f45;
   --wrong: #ad2d2d;
   --shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
-  --font-ui:
-    ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace;
+  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
   --font-ui-emoji:
     ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
